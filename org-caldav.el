@@ -1882,7 +1882,17 @@ Do nothing if LEVEL is larger than `org-caldav-debug-level'."
     (when org-caldav-description-blank-line-before (newline))
     (let ((beg (point)))
       (insert description)
-      (org-indent-region beg (point)))
+      (org-indent-region beg (point))
+      ;; Escape any remaining lines starting with asterisks (whatever
+      ;; their level), so the description cannot break the heading
+      ;; structure of the inbox (see issue #323).  This must happen
+      ;; after `org-indent-region', which would re-indent such lines
+      ;; back to column 0.
+      (let ((end (point-marker)))
+        (save-excursion
+          (goto-char beg)
+          (while (re-search-forward "^\\*" end t)
+            (replace-match " *" t t)))))
     (when org-caldav-description-blank-line-after (newline))
     (newline)))
 
