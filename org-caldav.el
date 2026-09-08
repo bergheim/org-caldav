@@ -383,20 +383,9 @@ the unit tests to fail otherwise."
   :type 'boolean)
 
 (defcustom org-caldav-description-heading-escape 'zero-width-space
-  "How to escape asterisk lines in imported event descriptions.
-Description lines starting with asterisks would otherwise be parsed
-as Org headings and corrupt the entry structure of the inbox (see
-issue #323).
-
-`zero-width-space' prefixes such lines with a zero width space
-\(U+200B), as recommended by the Org manual.  The escape character is
-stripped again when the entry is exported back to the calendar
-server, so the description round-trips unchanged.
-
-`space' uses a visible space instead.  Org then treats such lines as
-plain list items, which reads nicely in the inbox, but they are
-exported back as list bullets (e.g. \='‣\='), so the original asterisks
-are not restored on the server."
+  "How to escape leading asterisks in imported descriptions.
+`zero-width-space' uses U+200B, removed on export.
+`space' uses visible indentation but may change bullets on export."
   :type '(choice (const :tag "Zero width space (U+200B)" zero-width-space)
                  (const :tag "Space" space)))
 
