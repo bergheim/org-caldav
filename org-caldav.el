@@ -382,6 +382,24 @@ have trouble finding IDs in unsaved buffers, causing syncs and
 the unit tests to fail otherwise."
   :type 'boolean)
 
+(defcustom org-caldav-description-heading-escape 'zero-width-space
+  "How to escape asterisk lines in imported event descriptions.
+Description lines starting with asterisks would otherwise be parsed
+as Org headings and corrupt the entry structure of the inbox (see
+issue #323).
+
+`zero-width-space' prefixes such lines with a zero width space
+\(U+200B), as recommended by the Org manual.  The escape character is
+stripped again when the entry is exported back to the calendar
+server, so the description round-trips unchanged.
+
+`space' uses a visible space instead.  Org then treats such lines as
+plain list items, which reads nicely in the inbox, but they are
+exported back as list bullets (e.g. \='‣\='), so the original asterisks
+are not restored on the server."
+  :type '(choice (const :tag "Zero width space (U+200B)" zero-width-space)
+                 (const :tag "Space" space)))
+
 (defcustom org-caldav-description-blank-line-before t
   "Whether DESCRIPTION inserted into org should be preceded by blank line."
   :type 'boolean)
@@ -1793,7 +1811,9 @@ Returns buffer containing the ICS file."
                        '(org-caldav-scheduled-from-deadline)))))
         ;; Export events to one single ICS file.
         (apply 'org-icalendar--combine-files orgfiles)))
-    (find-file-noselect (symbol-value icalendar-file))))
+    (with-current-buffer (find-file-noselect (symbol-value icalendar-file))
+      (org-caldav-strip-zero-width-spaces)
+      (current-buffer))))
 
 (defun org-caldav-get-uid ()
   "Get UID for event in current buffer."
@@ -1886,15 +1906,31 @@ Do nothing if LEVEL is larger than `org-caldav-debug-level'."
       ;; Escape any remaining lines starting with asterisks (whatever
       ;; their level), so the description cannot break the heading
       ;; structure of the inbox (see issue #323).  This must happen
-      ;; after `org-indent-region', which would re-indent such lines
-      ;; back to column 0.
-      (let ((end (point-marker)))
+      ;; after `org-indent-region', which would re-indent
+      ;; space-escaped lines back to column 0.
+      (let ((end (point-marker))
+            (esc (org-caldav--description-escape-string)))
         (save-excursion
           (goto-char beg)
           (while (re-search-forward "^\\*" end t)
-            (replace-match " *" t t)))))
+            (replace-match (concat esc "*") t t)))))
     (when org-caldav-description-blank-line-after (newline))
     (newline)))
+
+(defun org-caldav--description-escape-string ()
+  "Return the escape string according to `org-caldav-description-heading-escape'."
+  (if (eq org-caldav-description-heading-escape 'space) " " "\u200B"))
+
+(defun org-caldav-strip-zero-width-spaces ()
+  "Remove zero width spaces (U+200B) from the current buffer.
+Inverse of the escaping done by `org-caldav--insert-description':
+zero-width-space escaped asterisk lines survive the icalendar export
+literally, so stripping the escape character from the exported ICS
+restores the original description on the calendar server."
+  (save-excursion
+    (goto-char (point-min))
+    (while (search-forward "\u200B" nil t)
+      (replace-match "" t t))))
 
 (defun org-caldav-insert-org-event-or-todo (eventdata-alist)
   "Insert org block from given event data at current position.
